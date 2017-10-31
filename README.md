@@ -1,7 +1,7 @@
 # Couchbase Nagios/Check_MK Plugin
 A plugin to monitor Couchbase REST APIs and forward metrics to Nagios/CheckMK.
 
-It is intended to be a standalone Nagios plugin as well as a reference for how to interact with the Couchbase REST APIs when building plugins for other systems.
+It is intended to be a standalone Nagios/Check_MK plugin as well as a reference for how to interact with the Couchbase REST APIs when building plugins for other systems.
 
 ## Requirements
 * Python requests module
