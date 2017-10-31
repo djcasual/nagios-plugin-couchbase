@@ -1,5 +1,5 @@
-# Couchbase Nagios Plugin
-A plugin to monitor Couchbase REST APIs and forward metrics to Nagios.
+# Couchbase Nagios/Check_MK Plugin
+A plugin to monitor Couchbase REST APIs and forward metrics to Nagios/CheckMK.
 
 It is intended to be a standalone Nagios plugin as well as a reference for how to interact with the Couchbase REST APIs when building plugins for other systems.
 
@@ -7,20 +7,22 @@ It is intended to be a standalone Nagios plugin as well as a reference for how t
 * Python requests module
 * PyYAML
 
-For Nagios:
+For Nagios/Check_MK:
 * send_nsca via the nsca or nsca-ng packages
 
 ## Configuration
-This plugin is configured to submit passive checks to Nagios via NSCA.  The set of metrics to monitor and thresholds for each metric are locally configured in the check_couchbase.yaml file.
+This plugin is configured to submit passive checks to Nagios/Check_MK via NSCA.  The set of metrics to monitor and thresholds for each metric are locally configured in the check_couchbase.yaml file.
 
 ### Minimum configuration
 Make sure the following properties match your environment:
 * couchbase_host
 * couchbase_user
 * couchbase_password
+* monitor_type
 * monitor_host
 * monitor_port
 * nagios_nsca_path
+* nagios_nsca_config
 
 Note that the user executing this script must have read access to /etc/send_nsca.cfg.
 
@@ -33,6 +35,27 @@ Service descriptions are built in the following format:
 The configuration file documents how the service description is built and how to customize it.
 
 The --dump-services flag can be used to output the Nagios service descriptions this script will use.
+
+### Check_MK services
+You must enable NSCA in your Check_MK configuration https://mathias-kettner.com/cms_wato_services.html#passive_checks
+
+You must have host and services configured in Check_MK in order for the passive check results to be accepted. The plugin allows you to customize the service description to match your Check_MK configuration.
+
+Custom check services built in the following format:
+{prefix}.{cluster name}.{label}.{metric description}
+
+The configuration file documents how the service description is built and how to customize it.
+
+The --dump-services flag can be used to output the Check_MK service descriptions this script will use.
+
+Alternatively you can create a full output of the configuration file used in CheckMK.
+The --dump-checkmk flag can be used to output the Check_MK custom_checks configuration and placed in /omd/sites/<site>/etc/check_mk/conf.d/<custom_name>.mk. Then reload Check_MK with "cmk -O".
+
+References:
+Passive Checks: https://mathias-kettner.com/cms_wato_services.html#passive_checks
+Configuration files: https://mathias-kettner.com/checkmk_configfiles.html#Further+configuration+files+in+conf.d
+Using your own plugin: https://mathias-kettner.com/cms_wato_services.html#active_checks
+
 
 ### Couchbase metrics
 This plugin comes pre-configured with a set of best-practice metrics.  It will be necessary to update the metric thresholds to reflect your Couchbase environment.
@@ -47,6 +70,7 @@ optional arguments:
   -c CONFIG_FILE, --config CONFIG_FILE
                         Path to the check_couchbase YAML file
   -d, --dump-services   Print service descriptions and exit
+  -k, --dump-checkmk    Print custom_checks configuration for Check_MK
   -n, --no-metrics      Do not send metrics to the monitoring host
   -v, --verbose         Enable debug logging to console
   -C COUCHBASE_HOST, --couchbase-host COUCHBASE_HOST
@@ -61,4 +85,4 @@ optional arguments:
                         Override the configured monitoring system type
 ```
 
-This script should be executed via cron or a Nagios NRPE check.
+This script should be executed via cron, a Nagios NRPE check, or as a command line rule in Check_MK (Classical active and passive monitoring checks).

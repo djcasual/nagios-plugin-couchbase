@@ -39,6 +39,7 @@ couchbase_ssl: False
 # The type of monitoring system in use
 #  Options are:
 #   nagios
+#   checkmk
 #   graphite
 monitor_type: nagios
 
@@ -49,6 +50,8 @@ monitor_host: localhost
 #  If Nagios, defaults are:
 #   nsca: 5667
 #   nsca-ng: 5668
+#  If Check_MK, default is:
+#   nsca: 5667
 #  If Graphite, default is:
 #    carbon: 2003
 monitor_port: 5668
@@ -63,7 +66,11 @@ monitor_port: 5668
 # Path to the send_nsca binary
 # Note that the user running this script must be able to read /etc/send_nsca.cfg
 nagios_nsca_path: /usr/sbin/send_nsca
+nagios_nsca_config: /etc/send_nsca.cfg
 
+# Check_MK Path for nsca binary and configuration
+# nagios_nsca_path: /omd/sites/<site>/version/bin/send_nsca
+# nagios_nsca_config: /omd/sites/<site>/etc/nsca/send_nsca.cfg
 
 #
 #

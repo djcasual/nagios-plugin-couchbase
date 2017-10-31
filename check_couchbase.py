@@ -8,7 +8,7 @@ Dependencies
  * python-requests
  * PyYAML
 
-For Nagios:
+For Nagios/Check_MK:
  * nsca-client or nsca-ng-client
 """
 
@@ -29,6 +29,7 @@ parser = argparse.ArgumentParser(usage="%(prog)s [options] -c CONFIG_FILE")
 parser.add_argument("-a", "--all-nodes", dest="all_nodes", action="store_true", help="Return metrics for all cluster nodes")
 parser.add_argument("-c", "--config", required=True, dest="config_file", action="store", help="Path to the check_couchbase YAML file")
 parser.add_argument("-d", "--dump-services",  dest="dump_services", action="store_true", help="Print service descriptions and exit")
+parser.add_argument("-k", "--dump-checkmk",  dest="dump_checkmk", action="store_true", help="Print custom configuration for Check_MK and exit")
 parser.add_argument("-n", "--no-metrics",  dest="no_metrics", action="store_true", help="Do not send metrics to the monitoring host")
 parser.add_argument("-v", "--verbose", dest="verbose", action="store_true", help="Enable debug logging to console")
 parser.add_argument("-C", "--couchbase-host",  dest="couchbase_host", action="store", help="Override the configured Couchbase host")
@@ -67,7 +68,7 @@ def main():
                     for bucket in couchbase_request(host, config["couchbase_admin_port"], "/pools/default/buckets?skipMap=true", config):
                         results = process_data_stats(host, bucket["name"], item["metrics"], config, results)
                 else:
-                    results = process_data_stats(host, item["bucket"], item["metrics"], tasks, config, results)
+                    results = process_data_stats(host, item["bucket"], item["metrics"], config, results)
 
         if "n1ql" in services:
             results = process_query_stats(host, config, results)
@@ -81,8 +82,12 @@ def main():
     else:
         cluster_name = "Default"
 
-    if config["monitor_type"] == "nagios":
+    if config["dump_checkmk"]:
+        create_checkmk(results, cluster_name, config)
+    elif config["monitor_type"] == "nagios":
         send_nagios(results, cluster_name, config)
+    elif config["monitor_type"] == "checkmk":
+        send_checkmk(results, cluster_name, config)
     elif config["monitor_type"] == "graphite":
         send_graphite(results, cluster_name, config)
     else:
@@ -115,10 +120,12 @@ def load_config():
     config.setdefault("couchbase_fts_port_ssl", 18094)
     config.setdefault("couchbase_ssl", True)
     config.setdefault("nagios_nsca_path", "/sbin/send_nsca")
+    config.setdefault("nagios_nsca_config", "/etc/nsca/send_nsca.cfg")
     config.setdefault("service_include_cluster_name", False)
     config.setdefault("service_include_label", False)
     config.setdefault("send_metrics", True)
     config.setdefault("dump_services", False)
+    config.setdefault("dump_checkmk", False)
     config.setdefault("all_nodes", False)
 
     if args.all_nodes:
@@ -126,6 +133,9 @@ def load_config():
 
     if args.dump_services:
         config["dump_services"] = True
+
+    if args.dump_checkmk:
+        config["dump_checkmk"] = True
 
     if args.no_metrics:
         config["send_metrics"] = False
@@ -459,7 +469,11 @@ def send_nagios(results, cluster_name, config):
             print("Path to send_nsca is invalid: {0}".format(config["nagios_nsca_path"]))
             sys.exit(2)
 
-        cmd = "{0} -H {1} -p {2}".format(config["nagios_nsca_path"], str(config["monitor_host"]), str(config["monitor_port"]))
+        if not os.path.exists(config["nagios_nsca_config"]):
+            print("Path to send_nsca.cfg is invalid: {0}".format(config["nagios_nsca_config"]))
+            sys.exit(2)
+
+        cmd = "{0} -H {1} -p {2} -c {3}".format(config["nagios_nsca_path"], str(config["monitor_host"]), str(config["monitor_port"]), config["nagios_nsca_config"])
 
         try:
             pipe = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -475,6 +489,64 @@ def send_nagios(results, cluster_name, config):
 
     print("OK - check_couchbase ran successfully")
 
+
+# Sends a passive check result to Check_MK with performance data
+def send_checkmk(results, cluster_name, config):
+    import subprocess
+
+    for result in results:
+        host = result["host"]
+        metric = result["metric"]
+        value = result["value"]
+        label = result["label"]
+
+        metric.setdefault("crit", None)
+        metric.setdefault("warn", None)
+        metric.setdefault("op", ">=")
+
+        if metric["op"] not in [">", ">=", "=", "<=", "<"]:
+            log.warning("Skipped metric: \"{0}\", invalid operator: {1}".format(metric["description"], metric["op"]))
+            continue
+
+        if isinstance(value, numbers.Number):
+            value = pretty_number(value)
+
+        service = build_service_description(metric["description"], cluster_name, label, config)
+        status, status_text = eval_status(value, metric["crit"], metric["warn"], metric["op"])
+        if isinstance(value, numbers.Number):
+            message = "{0} - {1}: {2} | {1}={2}".format(status_text, metric["metric"], value)
+        else:
+            message = "{0} - {1}: {2}".format(status_text, metric["metric"], value)
+        if config["dump_services"]:
+            print(service)
+            continue
+
+        line = "{0}\t{1}\t{2}\t{3}\n".format(host, service, status, message)
+        log.debug("Host: {0} Service: {1} Status: {2} Message: {3}".format(host, service, status, message))
+
+        if config["send_metrics"] is False:
+            continue
+
+        if not os.path.exists(config["nagios_nsca_path"]):
+            print("Path to send_nsca is invalid: {0}".format(config["nagios_nsca_path"]))
+            sys.exit(2)
+
+        cmd = "{0} -H {1} -p {2} -c {3} &> /dev/null".format(config["nagios_nsca_path"], str(config["monitor_host"]), str(config["monitor_port"]), config["nagios_nsca_config"])
+
+
+    try:
+            pipe = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+            out, err = pipe.communicate(line.encode())
+            pipe.stdin.close()
+            pipe.wait()
+
+            if pipe.returncode:
+                print("Failed to send metrics. {0}".format(err.decode().rstrip()))
+                sys.exit(2)
+        except:
+            raise
+
+    print("OK - check_couchbase ran successfully")
 
 # Sends results to Graphite using the pickle protocol
 def send_graphite(results, cluster_name, config):
@@ -509,6 +581,38 @@ def send_graphite(results, cluster_name, config):
     sock.connect((config["monitor_host"], config["monitor_port"]))
     sock.sendall(message)
     sock.close()
+
+# Dump custom_checks configuration for Check_MK WATO
+def create_checkmk(results, cluster_name, config):
+
+    lines = []
+
+    for result in results:
+        host = result["host"]
+        metric = result["metric"]
+        value = result["value"]
+        label = result["label"]
+
+        service = build_service_description(metric["description"], cluster_name, label, config).replace(" ", "-")
+
+        if config["dump_services"]:
+            print(service)
+            continue
+
+        if isinstance(value, numbers.Number):
+            line = "  ( {'service_description': u'" + "{0}.{1}.{2}.{3}".format(config["service_prefix"], cluster_name, label, metric["description"]) + "', 'freshness': {'output': u'Check result did not arrive in time', 'state': 3, 'interval': 10}, 'has_perfdata': True}, [], ['" + "{0}".format(host) + "'] ),"
+        else:
+            line = "  ( {'service_description': u'" + "{0}.{1}.{2}.{3}".format(config["service_prefix"], cluster_name, label, metric["description"]) + "', 'freshness': {'output': u'Check result did not arrive in time', 'state': 3, 'interval': 10}}, [], ['" + "{0}".format(host) + "'] ),"
+
+        log.debug(line)
+        lines.append(line)
+
+    if config["send_metrics"] is False:
+        return
+
+
+    message = '# Created by check_couchbase.py\n# encoding: utf-8\n\ncustom_checks = [\n' + '\n'.join(lines) + '\n] + custom_checks\n'
+    print(message)
 
 
 if __name__ == "__main__":
