@@ -49,6 +49,7 @@ The configuration file documents how the service description is built and how to
 The --dump-services flag can be used to output the Check_MK service descriptions this script will use.
 
 Alternatively you can create a full output of the configuration file used in CheckMK.
+
 The --dump-checkmk flag can be used to output the Check_MK custom_checks configuration and placed in /omd/sites/<site>/etc/check_mk/conf.d/<custom_name>.mk. Then reload Check_MK with "cmk -O".
 
 References:
