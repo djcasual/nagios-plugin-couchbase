@@ -53,8 +53,11 @@ Alternatively you can create a full output of the configuration file used in Che
 The --dump-checkmk flag can be used to output the Check_MK custom_checks configuration and placed in /omd/sites/<site>/etc/check_mk/conf.d/<custom_name>.mk. Then reload Check_MK with "cmk -O".
 
 References:
+
 Passive Checks: https://mathias-kettner.com/cms_wato_services.html#passive_checks
+
 Configuration files: https://mathias-kettner.com/checkmk_configfiles.html#Further+configuration+files+in+conf.d
+
 Using your own plugin: https://mathias-kettner.com/cms_wato_services.html#active_checks
 
 
