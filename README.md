@@ -4,7 +4,8 @@ A plugin to monitor Couchbase REST APIs and forward metrics to Nagios/CheckMK.
 It is intended to be a standalone Nagios/Check_MK plugin as well as a reference for how to interact with the Couchbase REST APIs when building plugins for other systems.
 
 ## Requirements
-* Python requests module
+* Python 2.7+
+* Python requests
 * PyYAML
 
 For Nagios/Check_MK:
@@ -30,19 +31,21 @@ Note that the user executing this script must have read access to /etc/send_nsca
 You must have services configured in Nagios in order for the passive check results to be accepted.  The plugin allows you to customize the service description to match your Nagios configuration.  
 
 Service descriptions are built in the following format:
-{prefix}.{cluster name}.{label}.{metric description}
+
+```{prefix}.{cluster name}.{label}.{metric description}```
 
 The configuration file documents how the service description is built and how to customize it.
 
 The --dump-services flag can be used to output the Nagios service descriptions this script will use.
 
 ### Check_MK services
-You must enable NSCA in your Check_MK configuration https://mathias-kettner.com/cms_wato_services.html#passive_checks
+You must have host and services configured in Check_MK in order for the passive check results to be accepted. The plugin allows you to customize the service description to match your Check_MK configuration. The plugin will also pass metrics for Check_MK performance graph and trends. 
 
-You must have host and services configured in Check_MK in order for the passive check results to be accepted. The plugin allows you to customize the service description to match your Check_MK configuration.
+You must enable NSCA in your Check_MK configuration, and create a passive check with the same service description name, enable 'check freshness', and enable 'performance data' if the service contains metrics : https://mathias-kettner.com/cms_wato_services.html#passive_checks
 
-Custom check services built in the following format:
-{prefix}.{cluster name}.{label}.{metric description}
+Service descriptions are built in the following format:
+
+```{prefix}.{cluster name}.{label}.{metric description}```
 
 The configuration file documents how the service description is built and how to customize it.
 
@@ -50,14 +53,12 @@ The --dump-services flag can be used to output the Check_MK service descriptions
 
 Alternatively you can create a full output of the configuration file used in CheckMK.
 
-The --dump-checkmk flag can be used to output the Check_MK custom_checks configuration and placed in /omd/sites/<site>/etc/check_mk/conf.d/<custom_name>.mk. Then reload Check_MK with "cmk -O".
+The --dump-checkmk flag can be used to output the Check_MK custom_checks configuration and placed in WATO conf.d directory under: /omd/sites/<site_name>/etc/check_mk/conf.d/<custom_name>.mk. Then reload Check_MK with "cmk -O".
 
 References:
 
 Passive Checks: https://mathias-kettner.com/cms_wato_services.html#passive_checks
-
 Configuration files: https://mathias-kettner.com/checkmk_configfiles.html#Further+configuration+files+in+conf.d
-
 Using your own plugin: https://mathias-kettner.com/cms_wato_services.html#active_checks
 
 

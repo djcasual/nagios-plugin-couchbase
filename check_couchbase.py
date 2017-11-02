@@ -534,7 +534,7 @@ def send_checkmk(results, cluster_name, config):
         cmd = "{0} -H {1} -p {2} -c {3} &> /dev/null".format(config["nagios_nsca_path"], str(config["monitor_host"]), str(config["monitor_port"]), config["nagios_nsca_config"])
 
 
-    try:
+        try:
             pipe = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
             out, err = pipe.communicate(line.encode())
             pipe.stdin.close()
